@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>WC-Sim · R32</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --bg:#0b0e13; --panel:#121722; --panel2:#1a2130; --line:#242c3d;
+    --ink:#e8edf7; --dim:#8b95a7; --accent:#5fa8ff; --good:#3ecf8e;
+    --warn:#f5a524; --bad:#ff5470; --live:#ff3355;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; }
+  header.top { display:flex; align-items:center; justify-content:space-between; padding:14px 22px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header.top h1 { font-size:16px; margin:0; letter-spacing:.5px; }
+  header.top .live-badge { display:none; align-items:center; gap:8px; background:var(--live); color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+  header.top .live-badge .dot { width:8px; height:8px; border-radius:50%; background:#fff; animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  main { max-width:1200px; margin:0 auto; padding:22px; display:grid; grid-template-columns:340px 1fr; gap:22px; }
+  .controls, .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .panel { padding:18px; }
+  label { display:block; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+  select, input[type="number"] { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--ink); padding:8px 10px; border-radius:6px; font:inherit; }
+  input[type="range"] { width:100%; }
+  .slider-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .slider-row .val { min-width:44px; text-align:right; font-variant-numeric:tabular-nums; color:var(--accent); font-weight:600; }
+  button { background:var(--accent); color:#0b0e13; border:0; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button.ghost:hover { background:rgba(95,168,255,0.1); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .xg-line { display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:1px solid var(--line); }
+  .xg-line:last-child { border-bottom:0; }
+  .xg-line .team { font-weight:600; }
+  .xg-line .val { font-size:22px; font-variant-numeric:tabular-nums; color:var(--accent); }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:var(--dim); margin:0 0 12px; }
+  h3 { font-size:14px; margin:0 0 10px; }
+  .market-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+  .mk-cell { background:var(--panel2); border-radius:6px; padding:10px 12px; text-align:center; }
+  .mk-cell label { font-size:10px; margin-bottom:4px; }
+  .mk-cell span { font-size:18px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .mk-cell small { display:block; color:var(--dim); font-size:11px; margin-top:2px; }
+  .three-col { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+  .player-row { display:grid; grid-template-columns:1.2fr .8fr .5fr .5fr; gap:8px; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13px; align-items:baseline; }
+  .player-row:last-child { border-bottom:0; }
+  .player-row .pn { font-weight:500; }
+  .player-row .pt { color:var(--dim); font-size:11px; }
+  .player-row .pp { text-align:right; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .player-row .po { text-align:right; color:var(--dim); font-size:11px; }
+  .play { padding:8px 10px; margin-bottom:6px; background:var(--panel2); border-left:3px solid var(--dim); border-radius:4px; font-size:13px; }
+  .play .tag { display:inline-block; font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px; margin-right:6px; }
+  .play-bet   { border-left-color:var(--good); } .play-bet .tag   { background:var(--good); color:#0b0e13; }
+  .play-fade  { border-left-color:var(--bad);  } .play-fade .tag  { background:var(--bad);  color:#fff; }
+  .play-live  { border-left-color:var(--accent);} .play-live .tag { background:var(--accent);color:#0b0e13; }
+  .play-hedge { border-left-color:var(--warn); } .play-hedge .tag { background:var(--warn); color:#0b0e13; }
+  .live-banner { display:none; align-items:center; gap:10px; background:linear-gradient(90deg,var(--live),#c11); color:#fff; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-weight:600; }
+  .live-banner .dot { width:10px; height:10px; border-radius:50%; background:#fff; animation:pulse 1.2s infinite; }
+  .live-block { background:var(--panel2); padding:12px; border-radius:8px; margin-bottom:14px; }
+  .live-block .row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .live-block .row:last-child { margin-bottom:0; }
+  .live-block input[type="number"] { width:60px; }
+  .goal-explorer { margin-top:18px; padding:14px; background:var(--panel2); border-radius:8px; }
+  .ge-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .ge-controls { display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; margin-bottom:12px; align-items:end; }
+  .ge-score { display:flex; align-items:center; gap:6px; }
+  .ge-score input { width:52px; }
+  .ge-sep { color:var(--dim); }
+  .scenario-cols { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+  .sc-col { background:var(--panel); padding:10px; border-radius:6px; border:1px solid var(--line); }
+  .sc-tag { font-weight:600; color:var(--accent); margin-bottom:8px; }
+  .sc-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+  .sc-cell { background:var(--panel2); padding:6px 8px; border-radius:4px; }
+  .sc-cell label { font-size:9px; margin-bottom:2px; }
+  .sc-cell span { font-size:14px; font-variant-numeric:tabular-nums; }
+  .sc-cell small { color:var(--dim); font-size:10px; }
+  .help { font-size:11px; color:var(--dim); }
+  .muted { color:var(--dim); }
+  .notes-box { margin-top:14px; padding:10px 12px; background:var(--panel2); border-radius:6px; font-size:12px; color:var(--dim); }
+  footer { max-width:1200px; margin:20px auto; padding:0 22px 30px; color:var(--dim); font-size:11px; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>WC-Sim · Round of 32</h1>
+  <div id="liveBadge" class="live-badge"><span class="dot"></span> LIVE</div>
+</header>
+
+<main>
+  <aside class="controls">
+    <label for="matchupSelect">Matchup</label>
+    <select id="matchupSelect"></select>
+
+    <div style="height:14px"></div>
+
+    <div class="slider-row">
+      <div style="flex:1">
+        <label>Possession (home)</label>
+        <input type="range" id="possSlider" min="35" max="75" step="1" value="55" />
+      </div>
+      <span class="val" id="possVal">55%</span>
+    </div>
+    <div class="slider-row">
+      <div style="flex:1">
+        <label>Tempo</label>
+        <input type="range" id="tempoSlider" min="14" max="34" step="1" value="23" />
+      </div>
+      <span class="val" id="tempoVal">23</span>
+    </div>
+    <div class="slider-row">
+      <div style="flex:1">
+        <label>Pressure</label>
+        <input type="range" id="pressureSlider" min="40" max="95" step="1" value="65" />
+      </div>
+      <span class="val" id="pressureVal">65</span>
+    </div>
+
+    <div class="live-block">
+      <label style="margin-bottom:8px"><input type="checkbox" id="liveToggle" /> Live mode</label>
+      <div class="row">
+        <label style="margin:0;flex:0">Score</label>
+        <input type="number" id="liveHomeGoals" min="0" max="9" value="0" />
+        <span class="ge-sep">-</span>
+        <input type="number" id="liveAwayGoals" min="0" max="9" value="0" />
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <button id="pullLive" class="ghost">⚡ Pull from live</button>
+        <button id="reset" class="ghost">Reset</button>
+      </div>
+      <p id="pullStatus" class="help" style="display:none;margin:8px 0 0"></p>
+    </div>
+
+    <div class="notes-box" id="notes"></div>
+  </aside>
+
+  <section>
+    <div id="liveBanner" class="live-banner"><span class="dot"></span> <span id="liveBannerText"></span></div>
+
+    <div class="panel">
+      <h2>Team xG (remaining)</h2>
+      <div class="xg-line">
+        <span class="team" id="xgHomeLbl">Home</span>
+        <span class="val"><span id="xgHomeVal">—</span></span>
+      </div>
+      <div class="xg-line">
+        <span class="team" id="xgAwayLbl">Away</span>
+        <span class="val"><span id="xgAwayVal">—</span></span>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="panel">
+      <h2>Match markets (FT)</h2>
+      <div class="three-col">
+        <div class="mk-cell"><label id="mkH_lbl">Home win</label><span id="mkH">—</span><small id="mkH_odds">—</small></div>
+        <div class="mk-cell"><label>Draw</label><span id="mkD">—</span><small id="mkD_odds">—</small></div>
+        <div class="mk-cell"><label id="mkA_lbl">Away win</label><span id="mkA">—</span><small id="mkA_odds">—</small></div>
+      </div>
+      <div class="market-grid">
+        <div class="mk-cell"><label>Over 1.5</label><span id="mkO15">—</span></div>
+        <div class="mk-cell"><label>Over 2.5</label><span id="mkO25">—</span></div>
+        <div class="mk-cell"><label>Over 3.5</label><span id="mkO35">—</span></div>
+      </div>
+      <div class="market-grid">
+        <div class="mk-cell"><label>BTTS-Yes</label><span id="mkBTTS">—</span></div>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="panel">
+      <h2>Player anytime-goal props</h2>
+      <div id="playersList"></div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="panel">
+      <h2>Model reads</h2>
+      <div id="playsList"></div>
+    </div>
+
+    <div class="goal-explorer">
+      <div class="ge-head">
+        <h3>Goal Scenario Explorer</h3>
+      </div>
+      <div class="ge-controls">
+        <div>
+          <label for="goalMinute">Goal at minute</label>
+          <input type="range" id="goalMinute" min="1" max="89" step="1" value="60" />
+          <span class="val" id="goalMinuteVal" style="display:block;text-align:right">60'</span>
+        </div>
+        <div>
+          <label style="font-size:11px">Comeback boost</label>
+          <label style="font-size:11px;color:var(--ink);text-transform:none;letter-spacing:0;margin:0">
+            <input type="checkbox" id="comebackBoost" checked /> +10% xG trailing
+          </label>
+        </div>
+        <div class="help">Fork the game at a hypothetical goal minute.</div>
+      </div>
+      <div class="scenario-cols">
+        <div class="sc-col">
+          <div class="sc-tag" id="scA_team">Home scores next</div>
+          <div class="sc-grid">
+            <div class="sc-cell"><label>Home win</label><span id="scA_pH">—</span><small id="scA_oH">@—</small></div>
+            <div class="sc-cell"><label>Draw</label><span id="scA_pD">—</span><small id="scA_oD">@—</small></div>
+            <div class="sc-cell"><label>Away win</label><span id="scA_pA">—</span><small id="scA_oA">@—</small></div>
+            <div class="sc-cell"><label>O 1.5</label><span id="scA_o15">—</span><small id="scA_oo15">@—</small></div>
+            <div class="sc-cell"><label>O 2.5</label><span id="scA_o25">—</span><small id="scA_oo25">@—</small></div>
+            <div class="sc-cell"><label>BTTS</label><span id="scA_btts">—</span><small id="scA_obtts">@—</small></div>
+          </div>
+        </div>
+        <div class="sc-col">
+          <div class="sc-tag" id="scB_team">Away scores next</div>
+          <div class="sc-grid">
+            <div class="sc-cell"><label>Home win</label><span id="scB_pH">—</span><small id="scB_oH">@—</small></div>
+            <div class="sc-cell"><label>Draw</label><span id="scB_pD">—</span><small id="scB_oD">@—</small></div>
+            <div class="sc-cell"><label>Away win</label><span id="scB_pA">—</span><small id="scB_oA">@—</small></div>
+            <div class="sc-cell"><label>O 1.5</label><span id="scB_o15">—</span><small id="scB_oo15">@—</small></div>
+            <div class="sc-cell"><label>O 2.5</label><span id="scB_o25">—</span><small id="scB_oo25">@—</small></div>
+            <div class="sc-cell"><label>BTTS</label><span id="scB_btts">—</span><small id="scB_obtts">@—</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Model: bivariate Poisson on 10×10 score grid · style-shaped possession exponents · knockout pressure dampener · chase-state xG lift · SoT×0.36 for player props · Live feed: ESPN FIFA World scoreboard (CORS-enabled).
+  <br/>Not gambling advice. Build your own bankroll discipline.
+</footer>
+
+<script>
+// matchups.js — R32 matchup baselines for wc-sim
+// xGBase = hand-calibrated from public WC '26 group-stage xG + tournament priors
+// possExp = possession exponent (higher = more sensitive to possession, i.e. possession-based attackers)
+//           NED 0.55, MAR 0.30 archived; counter teams get lower exponents.
+// style: "possession" | "hybrid" | "counter" — informs UI copy, not the math
+// espnKeys: strings that match ESPN scoreboard event name to auto-pull live state
+
+window.MATCHUPS = [
+  {
+    id: "BEL-SEN",
+    label: "Belgium vs Senegal",
+    home: { code: "BEL", name: "Belgium", xGBase: 1.72, possDefault: 55, possExp: 0.50, style: "possession" },
+    away: { code: "SEN", name: "Senegal", xGBase: 1.48, possDefault: 45, possExp: 0.35, style: "hybrid" },
+    tempo: 21, pressure: 68,
+    espnKeys: ["Belgium", "Senegal"],
+    espnEventId: "760493",
+    players: [
+      { team: "BEL", name: "De Bruyne",     role: "AM",  sotBase: 1.35 },
+      { team: "BEL", name: "Lukaku",        role: "ST",  sotBase: 1.20 },
+      { team: "BEL", name: "Doku",          role: "LW",  sotBase: 1.05 },
+      { team: "BEL", name: "Trossard",      role: "RW",  sotBase: 0.95 },
+      { team: "SEN", name: "Sarr",          role: "RW",  sotBase: 1.10 },
+      { team: "SEN", name: "H. Diarra",     role: "CM",  sotBase: 0.80 },
+      { team: "SEN", name: "Jackson",       role: "ST",  sotBase: 0.95 },
+      { team: "SEN", name: "Ndiaye (Iliman)", role: "AM", sotBase: 0.90 }
+    ],
+    notes: "Belgium slight favorite pre-match (Mirror 6/5). Senegal beat Iraq 5-0 in final group game; Belgium beat NZ 5-1 after Egypt/Iran draws."
+  },
+  {
+    id: "ENG-COD",
+    label: "England vs DR Congo",
+    home: { code: "ENG", name: "England", xGBase: 2.15, possDefault: 62, possExp: 0.55, style: "possession" },
+    away: { code: "COD", name: "DR Congo", xGBase: 0.95, possDefault: 38, possExp: 0.30, style: "counter" },
+    tempo: 22, pressure: 65,
+    espnKeys: ["England", "Congo"],
+    players: [
+      { team: "ENG", name: "Kane",     role: "ST", sotBase: 1.35 },
+      { team: "ENG", name: "Bellingham", role: "AM", sotBase: 1.10 },
+      { team: "ENG", name: "Saka",     role: "RW", sotBase: 1.05 },
+      { team: "ENG", name: "Foden",    role: "AM", sotBase: 1.00 },
+      { team: "COD", name: "Bakambu",  role: "ST", sotBase: 0.85 },
+      { team: "COD", name: "Wissa",    role: "ST", sotBase: 0.80 }
+    ],
+    notes: "England pure striker (Kane) — trustworthy archetype per audit rules."
+  },
+  {
+    id: "USA-BIH",
+    label: "USA vs Bosnia",
+    home: { code: "USA", name: "USA", xGBase: 1.70, possDefault: 55, possExp: 0.45, style: "hybrid" },
+    away: { code: "BIH", name: "Bosnia", xGBase: 1.25, possDefault: 45, possExp: 0.35, style: "hybrid" },
+    tempo: 23, pressure: 68,
+    espnKeys: ["United States", "Bosnia"],
+    players: [
+      { team: "USA", name: "Pulisic",   role: "LW", sotBase: 1.15 },
+      { team: "USA", name: "Balogun",   role: "ST", sotBase: 1.00 },
+      { team: "USA", name: "Reyna",     role: "AM", sotBase: 0.90 },
+      { team: "BIH", name: "Džeko",     role: "ST", sotBase: 0.90 },
+      { team: "BIH", name: "Tabaković", role: "ST", sotBase: 0.75 }
+    ],
+    notes: "Home leg for USA."
+  },
+  {
+    id: "FRA-SWE",
+    label: "France vs Sweden (archived)",
+    home: { code: "FRA", name: "France", xGBase: 2.08, possDefault: 58, possExp: 0.55, style: "possession" },
+    away: { code: "SWE", name: "Sweden", xGBase: 1.20, possDefault: 42, possExp: 0.35, style: "hybrid" },
+    tempo: 23, pressure: 65,
+    espnKeys: ["France", "Sweden"],
+    players: [
+      { team: "FRA", name: "Dembélé",  role: "RW", sotBase: 1.15 },
+      { team: "FRA", name: "Mbappé",   role: "LW", sotBase: 1.50 },
+      { team: "SWE", name: "Gyökeres", role: "ST", sotBase: 1.30 },
+      { team: "SWE", name: "Isak",     role: "ST", sotBase: 1.15 }
+    ],
+    notes: "Archived — FRA won 3-0. Retained for model verification."
+  },
+  {
+    id: "NED-MAR",
+    label: "Netherlands vs Morocco (archived HT 0-0 build)",
+    home: { code: "NED", name: "Netherlands", xGBase: 2.68, possDefault: 58, possExp: 0.55, style: "possession" },
+    away: { code: "MAR", name: "Morocco", xGBase: 1.85, possDefault: 42, possExp: 0.30, style: "counter" },
+    tempo: 23, pressure: 65,
+    espnKeys: ["Netherlands", "Morocco"],
+    players: [
+      { team: "NED", name: "Gakpo",     role: "LW", sotBase: 0.71 },
+      { team: "NED", name: "Brobbey",   role: "ST", sotBase: 1.05 },
+      { team: "MAR", name: "Hakimi",    role: "RB", sotBase: 1.50, hakimiEngine: true },
+      { team: "MAR", name: "En-Nesyri", role: "ST", sotBase: 0.85, enNesyriChannel: true },
+      { team: "MAR", name: "Díaz",      role: "AM", sotBase: 0.80 },
+      { team: "MAR", name: "Saibari",   role: "CM", sotBase: 0.55 }
+    ],
+    notes: "Reference build. Hakimi transition engine active for this matchup only."
+  }
+];
+
+// app.js — wc-sim engine
+// Architecture (from archived spec, session 19826272):
+//   Team xG = xGBase * possShift * tempoScaler * pressureDampener
+//   possShift = (poss/50)^possExp  (possession-based teams >0.5, counter teams closer to 0)
+//   tempoScaler = 0.75 + 0.5 * ((tempo-14)/20)   -> 0.75 at tempo 14, 1.25 at tempo 34
+//   pressureDampener = 1 - pressure/100 * 0.25   -> at pressure=88 (ET), dampener = 0.78
+//   Match result via bivariate-Poisson on 10x10 grid; independence approximation, rho=0
+//   Comeback boost: +10% xG for trailing team if >=20 min remain
+//   xG/SoT conversion for player props: 0.36
+//   Live mode: only remaining minutes contribute new xG (linear time scaling)
+
+(function () {
+  const state = {
+    matchup: null,
+    poss: 55,
+    tempo: 23,
+    pressure: 65,
+    live: {
+      active: false,
+      minute: 0,
+      homeGoals: 0,
+      awayGoals: 0,
+      comebackBoost: true
+    }
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const fmtPct = (p) => (p * 100).toFixed(1) + "%";
+  const fmtOdds = (p) => {
+    if (p <= 0 || p >= 1) return "—";
+    const dec = 1 / p;
+    if (dec >= 2) return "+" + Math.round((dec - 1) * 100);
+    return "-" + Math.round(100 / (dec - 1));
+  };
+
+  // Poisson pmf
+  function poisson(k, lambda) {
+    if (lambda <= 0) return k === 0 ? 1 : 0;
+    let logP = -lambda + k * Math.log(lambda);
+    for (let i = 2; i <= k; i++) logP -= Math.log(i);
+    return Math.exp(logP);
+  }
+
+  function teamXG(base, possShare, possExp, tempo, pressure) {
+    const possShift = Math.pow(possShare / 50, possExp);
+    const tempoScaler = 0.75 + 0.5 * ((tempo - 14) / 20);
+    const pressureDampener = 1 - (pressure / 100) * 0.25;
+    return base * possShift * tempoScaler * pressureDampener;
+  }
+
+  // Score grid over remaining goals from current live state (or full match if live off)
+  function computeScoreGrid(lambdaH, lambdaA) {
+    const grid = [];
+    for (let h = 0; h < 10; h++) {
+      grid[h] = [];
+      for (let a = 0; a < 10; a++) {
+        grid[h][a] = poisson(h, lambdaH) * poisson(a, lambdaA);
+      }
+    }
+    return grid;
+  }
+
+  // Given current score and remaining lambdas, produce FT market probabilities
+  function marketsFromGrid(grid, currentH, currentA) {
+    let pH = 0, pD = 0, pA = 0, pBTTS = 0, p15 = 0, p25 = 0, p35 = 0;
+    for (let dh = 0; dh < 10; dh++) {
+      for (let da = 0; da < 10; da++) {
+        const p = grid[dh][da];
+        const ftH = currentH + dh;
+        const ftA = currentA + da;
+        if (ftH > ftA) pH += p;
+        else if (ftH < ftA) pA += p;
+        else pD += p;
+        if (ftH >= 1 && ftA >= 1) pBTTS += p;
+        const total = ftH + ftA;
+        if (total >= 2) p15 += p;
+        if (total >= 3) p25 += p;
+        if (total >= 4) p35 += p;
+      }
+    }
+    return { pH, pD, pA, pBTTS, p15, p25, p35 };
+  }
+
+  // Player prop: probability of >=1 SoT-to-goal event across remaining minutes
+  // xGperMin = sotBase/90 * 0.36 * possShare-adjusted
+  function playerAnyTimeProb(sotBase, teamShare, minutesRemaining) {
+    // simple: expected goals contribution = sotBase/90 * 0.36 * minutesRemaining * (teamShare/50)^0.5
+    const shareAdj = Math.pow(teamShare / 50, 0.5);
+    const lambda = (sotBase / 90) * 0.36 * minutesRemaining * shareAdj;
+    return 1 - Math.exp(-lambda);
+  }
+
+  function currentMinute() {
+    return state.live.active ? state.live.minute : 0;
+  }
+
+  function minutesRemaining() {
+    const now = currentMinute();
+    return Math.max(0, 90 - now);
+  }
+
+  // Live lambdas: only remaining minutes contribute, with comeback boost if trailing team has >=20 min
+  function liveLambdas() {
+    const m = state.matchup;
+    const homeShare = state.poss;
+    const awayShare = 100 - state.poss;
+
+    let lambdaH_full = teamXG(m.home.xGBase, homeShare, m.home.possExp, state.tempo, state.pressure);
+    let lambdaA_full = teamXG(m.away.xGBase, awayShare, m.away.possExp, state.tempo, state.pressure);
+
+    const remaining = minutesRemaining();
+    const frac = remaining / 90;
+    let lambdaH = lambdaH_full * frac;
+    let lambdaA = lambdaA_full * frac;
+
+    // Comeback boost — trailing team gets +10% if >=20 min remain
+    if (state.live.active && state.live.comebackBoost && remaining >= 20) {
+      if (state.live.homeGoals < state.live.awayGoals) lambdaH *= 1.10;
+      else if (state.live.awayGoals < state.live.homeGoals) lambdaA *= 1.10;
+    }
+
+    return { lambdaH, lambdaA, lambdaH_full, lambdaA_full };
+  }
+
+  // ============ RENDER ============
+  function render() {
+    if (!state.matchup) return;
+    const m = state.matchup;
+    const { lambdaH, lambdaA, lambdaH_full, lambdaA_full } = liveLambdas();
+
+    $("xgHomeVal").textContent = (state.live.active ? lambdaH : lambdaH_full).toFixed(2);
+    $("xgAwayVal").textContent = (state.live.active ? lambdaA : lambdaA_full).toFixed(2);
+    $("xgHomeLbl").textContent = m.home.name;
+    $("xgAwayLbl").textContent = m.away.name;
+
+    const grid = computeScoreGrid(lambdaH, lambdaA);
+    const mk = marketsFromGrid(grid, state.live.homeGoals, state.live.awayGoals);
+
+    $("mkH").textContent = fmtPct(mk.pH);
+    $("mkD").textContent = fmtPct(mk.pD);
+    $("mkA").textContent = fmtPct(mk.pA);
+    $("mkH_odds").textContent = fmtOdds(mk.pH);
+    $("mkD_odds").textContent = fmtOdds(mk.pD);
+    $("mkA_odds").textContent = fmtOdds(mk.pA);
+    $("mkBTTS").textContent = fmtPct(mk.pBTTS);
+    $("mkO15").textContent = fmtPct(mk.p15);
+    $("mkO25").textContent = fmtPct(mk.p25);
+    $("mkO35").textContent = fmtPct(mk.p35);
+    $("mkH_lbl").textContent = m.home.code + " win";
+    $("mkA_lbl").textContent = m.away.code + " win";
+
+    // Player props
+    const remaining = minutesRemaining();
+    const rows = m.players.map((p) => {
+      const teamShare = p.team === m.home.code ? state.poss : 100 - state.poss;
+      const prob = playerAnyTimeProb(p.sotBase, teamShare, remaining || 90);
+      return { p, prob };
+    });
+    const playersHtml = rows.map(({ p, prob }) => {
+      return `<div class="player-row">
+        <span class="pn">${p.name}</span>
+        <span class="pt">${p.team} · ${p.role}</span>
+        <span class="pp">${fmtPct(prob)}</span>
+        <small class="po">${fmtOdds(prob)}</small>
+      </div>`;
+    }).join("");
+    $("playersList").innerHTML = playersHtml;
+
+    // Model reads
+    const reads = buildReads(mk, m, state);
+    $("playsList").innerHTML = reads.map(r =>
+      `<div class="play play-${r.tag.toLowerCase()}"><span class="tag">${r.tag}</span> ${r.text}</div>`
+    ).join("");
+
+    // Live banner
+    if (state.live.active) {
+      $("liveBanner").style.display = "flex";
+      $("liveBannerText").textContent =
+        `LIVE · ${m.home.code} ${state.live.homeGoals} - ${state.live.awayGoals} ${m.away.code} · ${state.live.minute}'`;
+    } else {
+      $("liveBanner").style.display = "none";
+    }
+
+    // Goal scenario explorer
+    renderScenarios(m, mk);
+  }
+
+  function buildReads(mk, m, s) {
+    const reads = [];
+    if (s.live.active) {
+      const trailing = s.live.homeGoals < s.live.awayGoals ? m.home.code :
+                       s.live.awayGoals < s.live.homeGoals ? m.away.code : null;
+      const leading = trailing === m.home.code ? m.away.code :
+                      trailing === m.away.code ? m.home.code : null;
+      if (trailing && minutesRemaining() >= 20) {
+        reads.push({ tag: "LIVE", text: `${trailing} trailing with ${minutesRemaining()}' remaining. Comeback boost is ${s.live.comebackBoost ? "ON" : "OFF"} — flip to see xG delta.` });
+      }
+      if (mk.p25 >= 0.5 && s.live.homeGoals + s.live.awayGoals <= 1) {
+        reads.push({ tag: "BET", text: `Live Over 2.5 sits at ${fmtPct(mk.p25)}. Books cut O2.5 hard after first goal; if you can grab +130 or better, fade.` });
+      }
+      if (leading && mk[leading === m.home.code ? "pH" : "pA"] >= 0.55) {
+        reads.push({ tag: "HEDGE", text: `${leading} win prob ${fmtPct(mk[leading === m.home.code ? "pH" : "pA"])}. Consider ${leading} TT Over 1.5 as leverage.` });
+      }
+    } else {
+      // Pre-match reads
+      const edgeHome = mk.pH - 0.42;
+      if (Math.abs(edgeHome) > 0.08) {
+        reads.push({ tag: edgeHome > 0 ? "BET" : "FADE", text: `Model ${edgeHome > 0 ? "over" : "under"}weights ${m.home.code} by ${(edgeHome * 100).toFixed(1)}pp vs. typical R32 favorite line.` });
+      }
+      reads.push({ tag: "BET", text: `O2.5 at ${fmtPct(mk.p25)} — compare vs. market. Threshold: fade if market implies <${(mk.p25 * 100 - 5).toFixed(0)}%.` });
+      reads.push({ tag: "LIVE", text: `Watch for early goal → live O2.5 typically overcuts. See scenario explorer below for goal-at-minute deltas.` });
+    }
+    if (reads.length === 0) reads.push({ tag: "LIVE", text: "Model in neutral zone. No high-conviction reads on current inputs." });
+    return reads;
+  }
+
+  function renderScenarios(m, baseMk) {
+    // Two forks: home scores next, away scores next — at goalMinute (from slider)
+    const goalMin = parseInt($("goalMinute").value, 10);
+    $("goalMinuteVal").textContent = goalMin + "'";
+    const remaining = Math.max(0, 90 - goalMin);
+
+    // Use current live score as base
+    const cH = state.live.homeGoals;
+    const cA = state.live.awayGoals;
+
+    // Fork A: home scores next at goalMin -> new score cH+1 to cA, remaining minutes from goalMin
+    // Fork B: away scores next at goalMin -> new score cH to cA+1
+    const forkLambda = (extraForHome) => {
+      const { lambdaH_full, lambdaA_full } = liveLambdas();
+      const frac = remaining / 90;
+      let lH = lambdaH_full * frac;
+      let lA = lambdaA_full * frac;
+      // Apply comeback boost to trailing team post-goal
+      const newH = cH + (extraForHome ? 1 : 0);
+      const newA = cA + (extraForHome ? 0 : 1);
+      if (state.live.comebackBoost && remaining >= 20) {
+        if (newH < newA) lH *= 1.10;
+        else if (newA < newH) lA *= 1.10;
+      }
+      const grid = computeScoreGrid(lH, lA);
+      return marketsFromGrid(grid, newH, newA);
+    };
+
+    const forkA = forkLambda(true);
+    const forkB = forkLambda(false);
+
+    $("scA_team").textContent = `${m.home.name} scores next (${goalMin}')`;
+    $("scB_team").textContent = `${m.away.name} scores next (${goalMin}')`;
+
+    $("scA_pH").textContent = fmtPct(forkA.pH); $("scA_oH").textContent = "@" + fmtOdds(forkA.pH);
+    $("scA_pD").textContent = fmtPct(forkA.pD); $("scA_oD").textContent = "@" + fmtOdds(forkA.pD);
+    $("scA_pA").textContent = fmtPct(forkA.pA); $("scA_oA").textContent = "@" + fmtOdds(forkA.pA);
+    $("scA_o15").textContent = fmtPct(forkA.p15); $("scA_oo15").textContent = "@" + fmtOdds(forkA.p15);
+    $("scA_o25").textContent = fmtPct(forkA.p25); $("scA_oo25").textContent = "@" + fmtOdds(forkA.p25);
+    $("scA_btts").textContent = fmtPct(forkA.pBTTS); $("scA_obtts").textContent = "@" + fmtOdds(forkA.pBTTS);
+
+    $("scB_pH").textContent = fmtPct(forkB.pH); $("scB_oH").textContent = "@" + fmtOdds(forkB.pH);
+    $("scB_pD").textContent = fmtPct(forkB.pD); $("scB_oD").textContent = "@" + fmtOdds(forkB.pD);
+    $("scB_pA").textContent = fmtPct(forkB.pA); $("scB_oA").textContent = "@" + fmtOdds(forkB.pA);
+    $("scB_o15").textContent = fmtPct(forkB.p15); $("scB_oo15").textContent = "@" + fmtOdds(forkB.p15);
+    $("scB_o25").textContent = fmtPct(forkB.p25); $("scB_oo25").textContent = "@" + fmtOdds(forkB.p25);
+    $("scB_btts").textContent = fmtPct(forkB.pBTTS); $("scB_obtts").textContent = "@" + fmtOdds(forkB.pBTTS);
+  }
+
+  // ============ LIVE PULL ============
+  // ESPN scoreboard JSON has CORS: *  and covers all WC games.
+  const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
+
+  async function pullLive() {
+    const btn = $("pullLive");
+    const status = $("pullStatus");
+    btn.disabled = true;
+    status.style.display = "block";
+    status.textContent = "Fetching live state from ESPN…";
+    try {
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0,10).replace(/-/g,"");
+      const url = `${ESPN_URL}?dates=${dateStr}`;
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) throw new Error("ESPN " + resp.status);
+      const data = await resp.json();
+      const m = state.matchup;
+      const evt = (data.events || []).find(e => {
+        const nm = (e.name || "") + " " + (e.shortName || "");
+        return m.espnKeys.every(k => nm.includes(k));
+      });
+      if (!evt) {
+        status.textContent = `No live event on ESPN for ${m.label} today. Falling back to manual score entry.`;
+        return;
+      }
+      const comp = evt.competitions[0];
+      const st = comp.status;
+      const clock = st.displayClock || (st.clock ? Math.round(st.clock/60) + "'" : "");
+      const stateType = st.type.state;   // "pre" | "in" | "post"
+      const detail = st.type.detail;     // "HT", "FT", etc.
+
+      let homeScore = 0, awayScore = 0;
+      for (const c of comp.competitors) {
+        const isHome = c.homeAway === "home";
+        // ESPN's home/away is by scheduling; our matchup home may differ.
+        // We match by team name.
+        const teamName = c.team.displayName || c.team.name;
+        if (teamName.includes(m.home.name) || m.home.name.includes(teamName)) {
+          homeScore = parseInt(c.score, 10) || 0;
+        } else if (teamName.includes(m.away.name) || m.away.name.includes(teamName)) {
+          awayScore = parseInt(c.score, 10) || 0;
+        }
+      }
+
+      // Minute: prefer numeric clock if game in progress, cap at 89 for slider
+      let minute = 0;
+      if (stateType === "in") {
+        if (detail && detail.toUpperCase().includes("HT")) minute = 45;
+        else if (clock && /\d+/.test(clock)) minute = parseInt(clock.match(/\d+/)[0], 10);
+        else if (st.clock) minute = Math.round(st.clock / 60);
+      } else if (stateType === "post") {
+        minute = 90;
+      }
+
+      $("liveHomeGoals").value = homeScore;
+      $("liveAwayGoals").value = awayScore;
+      $("goalMinute").value = Math.min(89, Math.max(1, minute || 60));
+      $("liveToggle").checked = stateType === "in" || stateType === "post";
+      state.live.active = $("liveToggle").checked;
+      state.live.homeGoals = homeScore;
+      state.live.awayGoals = awayScore;
+      state.live.minute = minute;
+
+      status.textContent = `ESPN ${stateType.toUpperCase()} · ${m.home.code} ${homeScore} - ${awayScore} ${m.away.code} · ${clock || detail || minute+"'"} · pulled ${new Date().toLocaleTimeString()}`;
+      render();
+    } catch (err) {
+      status.textContent = "Live pull failed: " + err.message + ". Fill score/minute manually and continue.";
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ============ INIT ============
+  function populateDropdown() {
+    const sel = $("matchupSelect");
+    sel.innerHTML = window.MATCHUPS.map(m =>
+      `<option value="${m.id}">${m.label}</option>`
+    ).join("");
+    sel.value = "BEL-SEN";
+  }
+
+  function loadMatchup(id) {
+    const m = window.MATCHUPS.find(x => x.id === id);
+    if (!m) return;
+    state.matchup = m;
+    state.poss = m.home.possDefault;
+    state.tempo = m.tempo;
+    state.pressure = m.pressure;
+    state.live.active = false;
+    state.live.homeGoals = 0;
+    state.live.awayGoals = 0;
+    state.live.minute = 0;
+    $("possSlider").value = state.poss;
+    $("possVal").textContent = state.poss + "%";
+    $("tempoSlider").value = state.tempo;
+    $("tempoVal").textContent = state.tempo;
+    $("pressureSlider").value = state.pressure;
+    $("pressureVal").textContent = state.pressure;
+    $("liveToggle").checked = false;
+    $("liveHomeGoals").value = 0;
+    $("liveAwayGoals").value = 0;
+    $("notes").textContent = m.notes || "";
+    render();
+  }
+
+  function wireControls() {
+    $("matchupSelect").addEventListener("change", (e) => loadMatchup(e.target.value));
+    $("possSlider").addEventListener("input", (e) => {
+      state.poss = parseInt(e.target.value, 10);
+      $("possVal").textContent = state.poss + "%";
+      render();
+    });
+    $("tempoSlider").addEventListener("input", (e) => {
+      state.tempo = parseInt(e.target.value, 10);
+      $("tempoVal").textContent = state.tempo;
+      render();
+    });
+    $("pressureSlider").addEventListener("input", (e) => {
+      state.pressure = parseInt(e.target.value, 10);
+      $("pressureVal").textContent = state.pressure;
+      render();
+    });
+    $("liveToggle").addEventListener("change", (e) => {
+      state.live.active = e.target.checked;
+      render();
+    });
+    $("liveHomeGoals").addEventListener("input", (e) => {
+      state.live.homeGoals = parseInt(e.target.value, 10) || 0;
+      render();
+    });
+    $("liveAwayGoals").addEventListener("input", (e) => {
+      state.live.awayGoals = parseInt(e.target.value, 10) || 0;
+      render();
+    });
+    $("goalMinute").addEventListener("input", () => render());
+    $("comebackBoost").addEventListener("change", (e) => {
+      state.live.comebackBoost = e.target.checked;
+      render();
+    });
+    $("pullLive").addEventListener("click", pullLive);
+    $("reset").addEventListener("click", () => loadMatchup(state.matchup.id));
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    populateDropdown();
+    wireControls();
+    loadMatchup("BEL-SEN");
+  });
+})();
+</script></body></html>
