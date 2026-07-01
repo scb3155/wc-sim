@@ -45,11 +45,12 @@ window.MATCHUPS = [
   },
   {
     id: "USA-BIH",
-    label: "USA vs Bosnia",
-    home: { code: "USA", name: "USA", xGBase: 1.70, possDefault: 55, possExp: 0.45, style: "hybrid" },
-    away: { code: "BIH", name: "Bosnia", xGBase: 1.25, possDefault: 45, possExp: 0.35, style: "hybrid" },
-    tempo: 23, pressure: 68,
+    label: "USA vs Bosnia-Herzegovina",
+    home: { code: "USA", name: "United States", xGBase: 1.75, possDefault: 56, possExp: 0.45, style: "hybrid" },
+    away: { code: "BIH", name: "Bosnia-Herzegovina", xGBase: 1.20, possDefault: 44, possExp: 0.35, style: "hybrid" },
+    tempo: 22, pressure: 68,
     espnKeys: ["United States", "Bosnia"],
+    espnEventId: "760494",
     players: [
       { team: "USA", name: "Pulisic",   role: "LW", sotBase: 1.15 },
       { team: "USA", name: "Balogun",   role: "ST", sotBase: 1.00 },
