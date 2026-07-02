@@ -297,6 +297,8 @@
       const dates = [espnDateStr(0), espnDateStr(-1), espnDateStr(1)];
       let evt = null;
       let queriedDates = [];
+      const homeCode = (m.home.code || "").toUpperCase();
+      const awayCode = (m.away.code || "").toUpperCase();
       for (const dateStr of dates) {
         queriedDates.push(dateStr);
         const url = `${ESPN_URL}?dates=${dateStr}`;
@@ -304,8 +306,13 @@
         if (!resp.ok) continue;
         const data = await resp.json();
         evt = (data.events || []).find(e => {
+          // Primary: match by team abbreviations on competitors
+          const abbrs = ((e.competitions || [])[0]?.competitors || [])
+            .map(c => (c.team?.abbreviation || "").toUpperCase());
+          if (abbrs.includes(homeCode) && abbrs.includes(awayCode)) return true;
+          // Fallback: substring match on event name/shortName
           const nm = ((e.name || "") + " " + (e.shortName || "")).toLowerCase();
-          return m.espnKeys.every(k => nm.includes(k.toLowerCase()));
+          return (m.espnKeys || []).every(k => nm.includes(k.toLowerCase()));
         });
         if (evt) break;
       }
@@ -320,16 +327,23 @@
       const detail = st.type.detail;     // "HT", "FT", etc.
 
       let homeScore = 0, awayScore = 0;
+      let matchedHome = false, matchedAway = false;
       for (const c of comp.competitors) {
-        const isHome = c.homeAway === "home";
-        // ESPN's home/away is by scheduling; our matchup home may differ.
-        // We match by team name.
-        const teamName = c.team.displayName || c.team.name;
-        if (teamName.includes(m.home.name) || m.home.name.includes(teamName)) {
-          homeScore = parseInt(c.score, 10) || 0;
-        } else if (teamName.includes(m.away.name) || m.away.name.includes(teamName)) {
-          awayScore = parseInt(c.score, 10) || 0;
-        }
+        // Prefer abbreviation match (ESPN's abbreviation is stable: USA, BIH, ENG, COD, BEL, SEN)
+        // Fall back to case-insensitive name substring for edge cases.
+        const abbr = (c.team.abbreviation || "").toUpperCase();
+        const nm = ((c.team.displayName || c.team.name || "") + "").toLowerCase();
+        const homeCode = (m.home.code || "").toUpperCase();
+        const awayCode = (m.away.code || "").toUpperCase();
+        const homeName = (m.home.name || "").toLowerCase();
+        const awayName = (m.away.name || "").toLowerCase();
+        const isHome = abbr === homeCode || (homeName && (nm.includes(homeName) || homeName.includes(nm)));
+        const isAway = abbr === awayCode || (awayName && (nm.includes(awayName) || awayName.includes(nm)));
+        if (isHome) { homeScore = parseInt(c.score, 10) || 0; matchedHome = true; }
+        else if (isAway) { awayScore = parseInt(c.score, 10) || 0; matchedAway = true; }
+      }
+      if (!matchedHome || !matchedAway) {
+        status.textContent = `Warning: only matched ${matchedHome ? m.home.code : ""}${matchedHome&&matchedAway?"+":""}${matchedAway ? m.away.code : ""} on ESPN. Score may be incomplete. Verify manually.`;
       }
 
       // Minute: prefer numeric clock if game in progress, cap at 89 for slider
