@@ -175,8 +175,12 @@
     // Live banner
     if (state.live.active) {
       $("liveBanner").style.display = "flex";
+      const min = state.live.minute;
+      const clockDisplay = state.live.clockLabel
+        ? state.live.clockLabel
+        : (min >= 90 ? "FT/AET" : `${min}'`);
       $("liveBannerText").textContent =
-        `LIVE · ${m.home.code} ${state.live.homeGoals} - ${state.live.awayGoals} ${m.away.code} · ${state.live.minute}'`;
+        `LIVE · ${m.home.code} ${state.live.homeGoals} - ${state.live.awayGoals} ${m.away.code} · ${clockDisplay}`;
     } else {
       $("liveBanner").style.display = "none";
     }
@@ -267,6 +271,19 @@
   // ESPN scoreboard JSON has CORS: *  and covers all WC games.
   const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
 
+  // Format a Date as YYYYMMDD in America/New_York — ESPN indexes events by local (US) date,
+  // not UTC. Using UTC breaks the query after ~8pm ET when UTC rolls to the next day.
+  function espnDateStr(offsetDays) {
+    const d = new Date();
+    if (offsetDays) d.setUTCDate(d.getUTCDate() + offsetDays);
+    // Format in America/New_York
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(d).reduce((a,p) => (a[p.type]=p.value, a), {});
+    return `${parts.year}${parts.month}${parts.day}`;
+  }
+
   async function pullLive() {
     const btn = $("pullLive");
     const status = $("pullStatus");
@@ -274,19 +291,26 @@
     status.style.display = "block";
     status.textContent = "Fetching live state from ESPN…";
     try {
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0,10).replace(/-/g,"");
-      const url = `${ESPN_URL}?dates=${dateStr}`;
-      const resp = await fetch(url, { cache: "no-store" });
-      if (!resp.ok) throw new Error("ESPN " + resp.status);
-      const data = await resp.json();
       const m = state.matchup;
-      const evt = (data.events || []).find(e => {
-        const nm = (e.name || "") + " " + (e.shortName || "");
-        return m.espnKeys.every(k => nm.includes(k));
-      });
+      // Query today, yesterday, and tomorrow ET to catch games that straddle UTC boundary
+      // and any that ESPN indexes under an adjacent date. First match wins.
+      const dates = [espnDateStr(0), espnDateStr(-1), espnDateStr(1)];
+      let evt = null;
+      let queriedDates = [];
+      for (const dateStr of dates) {
+        queriedDates.push(dateStr);
+        const url = `${ESPN_URL}?dates=${dateStr}`;
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        evt = (data.events || []).find(e => {
+          const nm = ((e.name || "") + " " + (e.shortName || "")).toLowerCase();
+          return m.espnKeys.every(k => nm.includes(k.toLowerCase()));
+        });
+        if (evt) break;
+      }
       if (!evt) {
-        status.textContent = `No live event on ESPN for ${m.label} today. Falling back to manual score entry.`;
+        status.textContent = `No ESPN event found for ${m.label} (checked ${queriedDates.join(", ")}). Fill score/minute manually.`;
         return;
       }
       const comp = evt.competitions[0];
@@ -326,6 +350,8 @@
       state.live.homeGoals = homeScore;
       state.live.awayGoals = awayScore;
       state.live.minute = minute;
+      // Preserve the raw ESPN clock label ("45'+5'", "HT", "FT", "AET", "120'+12'") for banner display
+      state.live.clockLabel = (stateType === "post") ? (detail || "FT") : (clock || detail || "");
 
       status.textContent = `ESPN ${stateType.toUpperCase()} · ${m.home.code} ${homeScore} - ${awayScore} ${m.away.code} · ${clock || detail || minute+"'"} · pulled ${new Date().toLocaleTimeString()}`;
       render();
